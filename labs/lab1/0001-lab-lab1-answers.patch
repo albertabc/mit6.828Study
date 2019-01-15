@@ -1,0 +1,98 @@
+From 4ee4ea27e129644c4b5e67d4f76648cdef9401b6 Mon Sep 17 00:00:00 2001
+From: albert <learning.albert.zhang@gmail.com>
+Date: Tue, 15 Jan 2019 14:29:22 +0800
+Subject: [PATCH] [lab] lab1 answers
+
+Signed-off-by: albert <learning.albert.zhang@gmail.com>
+---
+ labs/lab1/kern/kdebug.c  |  6 ++++++
+ labs/lab1/kern/monitor.c | 20 ++++++++++++++++++--
+ labs/lab1/lib/printfmt.c |  7 +++----
+ 3 files changed, 27 insertions(+), 6 deletions(-)
+
+diff --git a/labs/lab1/kern/kdebug.c b/labs/lab1/kern/kdebug.c
+index 9547143..5469eb4 100644
+--- a/labs/lab1/kern/kdebug.c
++++ b/labs/lab1/kern/kdebug.c
+@@ -179,6 +179,12 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
+ 	//	Look at the STABS documentation and <inc/stab.h> to find
+ 	//	which one.
+ 	// Your code here.
++	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr);
++	if (lline <= rline) {
++        info->eip_line = stabs[lline].n_desc;
++	} else {
++        return -1;
++	}
+ 
+ 
+ 	// Search backwards from the line number for the relevant filename
+diff --git a/labs/lab1/kern/monitor.c b/labs/lab1/kern/monitor.c
+index e137e92..7d4c1d8 100644
+--- a/labs/lab1/kern/monitor.c
++++ b/labs/lab1/kern/monitor.c
+@@ -6,6 +6,7 @@
+ #include <inc/memlayout.h>
+ #include <inc/assert.h>
+ #include <inc/x86.h>
++#include <inc/types.h>
+ 
+ #include <kern/console.h>
+ #include <kern/monitor.h>
+@@ -24,6 +25,7 @@ struct Command {
+ static struct Command commands[] = {
+ 	{ "help", "Display this list of commands", mon_help },
+ 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
++	{ "backtrace", "Display the stack of function call", mon_backtrace},
+ };
+ 
+ /***** Implementations of basic kernel monitor commands *****/
+@@ -58,11 +60,25 @@ int
+ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
+ {
+ 	// Your code here.
++	uint32_t ebp, eip, i;
++	uint32_t arg[5];
++	struct Eipdebuginfo info;
++	ebp = read_ebp();
++	while (ebp != 0x0) {
++		eip = *(uint32_t *)(ebp + 4);
++		debuginfo_eip(eip, &info);
++		for (i = 0; i < 5; i++) {
++		    arg[i] = *(uint32_t *)(ebp + 4 * (i + 2));
++		}
++		cprintf("ebp %x eip %x args %08x %08x %08x %08x %08x\n", ebp, eip,
++		        arg[0], arg[1], arg[2], arg[3], arg[4]);
++		cprintf("     %s:%d: ", info.eip_file, info.eip_line);
++		cprintf("%.*s+%d\n", info.eip_fn_namelen, info.eip_fn_name, eip - info.eip_fn_addr);
++		ebp = *(uint32_t *)ebp;
++	}
+ 	return 0;
+ }
+ 
+-
+-
+ /***** Kernel monitor command interpreter *****/
+ 
+ #define WHITESPACE "\t\r\n "
+diff --git a/labs/lab1/lib/printfmt.c b/labs/lab1/lib/printfmt.c
+index 28e01c9..af23abe 100644
+--- a/labs/lab1/lib/printfmt.c
++++ b/labs/lab1/lib/printfmt.c
+@@ -206,10 +206,9 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
+ 		// (unsigned) octal
+ 		case 'o':
+ 			// Replace this with your code.
+-			putch('X', putdat);
+-			putch('X', putdat);
+-			putch('X', putdat);
+-			break;
++			num = getuint(&ap, lflag);
++			base = 8;
++			goto number;
+ 
+ 		// pointer
+ 		case 'p':
+-- 
+2.7.4
+

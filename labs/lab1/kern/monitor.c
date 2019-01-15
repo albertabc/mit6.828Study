@@ -6,6 +6,7 @@
 #include <inc/memlayout.h>
 #include <inc/assert.h>
 #include <inc/x86.h>
+#include <inc/types.h>
 
 #include <kern/console.h>
 #include <kern/monitor.h>
@@ -24,6 +25,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "backtrace", "Display the stack of function call", mon_backtrace},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -58,10 +60,24 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	uint32_t ebp, eip, i;
+	uint32_t arg[5];
+	struct Eipdebuginfo info;
+	ebp = read_ebp();
+	while (ebp != 0x0) {
+		eip = *(uint32_t *)(ebp + 4);
+		debuginfo_eip(eip, &info);
+		for (i = 0; i < 5; i++) {
+		    arg[i] = *(uint32_t *)(ebp + 4 * (i + 2));
+		}
+		cprintf("ebp %x eip %x args %08x %08x %08x %08x %08x\n", ebp, eip,
+		        arg[0], arg[1], arg[2], arg[3], arg[4]);
+		cprintf("     %s:%d: ", info.eip_file, info.eip_line);
+		cprintf("%.*s+%d\n", info.eip_fn_namelen, info.eip_fn_name, eip - info.eip_fn_addr);
+		ebp = *(uint32_t *)ebp;
+	}
 	return 0;
 }
-
-
 
 /***** Kernel monitor command interpreter *****/
 
